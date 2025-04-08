@@ -1,0 +1,73 @@
+#!/bin/bash
+
+LOG_FILE="/var/log/wazuh/firewall_Full.log"
+STATE_FILE="/var/ossec/active-response/bin/firewall_state.json"
+WHITELIST="/var/ossec/active-response/bin/whitelist.txt"
+
+ACTION=$1
+read INPUT_JSON
+
+# Extraction robuste de l'alerte
+ALERT=$(echo "$INPUT_JSON" | jq -r '.parameters.alert // .alert // empty')
+
+# Debug: log brut
+echo "$(date '+%F %T') 🔍 JSON brut reçu: $INPUT_JSON" >> "$LOG_FILE"
+
+# Extraction de l’IP
+IP=$(echo "$ALERT" | jq -r '.data.srcip // .srcip // empty')
+
+# Vérification IP valide
+if [ -z "$IP" ] || [ "$IP" == "null" ]; then
+    echo "$(date '+%F %T') ❌ IP invalide ou non présente, sortie. Donnée reçue: $INPUT_JSON" >> "$LOG_FILE"
+    exit 1
+fi
+
+# Whitelist
+if grep -qFx "$IP" "$WHITELIST"; then
+    echo "$(date '+%F %T') 🛡️ IP $IP dans whitelist, ignorée." >> "$LOG_FILE"
+    exit 0
+fi
+
+# Init état
+[ ! -f "$STATE_FILE" ] && echo '{}' > "$STATE_FILE"
+
+# Incrément
+COUNT=$(jq -r --arg ip "$IP" '.[$ip].count // 0' "$STATE_FILE")
+NEW_COUNT=$((COUNT + 1))
+
+# Durée par palier
+case $NEW_COUNT in
+    1) DURATION=30 ;;
+    2) DURATION=300 ;;
+    3) DURATION=3600 ;;
+    *) DURATION=0 ;;
+esac
+
+# Sauvegarde état
+jq --arg ip "$IP" --argjson count "$NEW_COUNT" \
+   '.[$ip].count = $count | .[$ip].last_seen = (now | todate)' \
+   "$STATE_FILE" > tmp.$$.json && mv tmp.$$.json "$STATE_FILE"
+
+# Traitement des actions
+case "$ACTION" in
+  add)
+    iptables -I INPUT -s "$IP" -j DROP
+    if [ "$DURATION" -eq 0 ]; then
+      echo "$(date '+%F %T') ⛔ IP $IP bloquée définitivement (tentatives: $NEW_COUNT)." >> "$LOG_FILE"
+    else
+      echo "$(date '+%F %T') ⛔ IP $IP bloquée pour $DURATION secondes (tentatives: $NEW_COUNT)." >> "$LOG_FILE"
+      (sleep "$DURATION"; iptables -D INPUT -s "$IP" -j DROP && \
+       echo "$(date '+%F %T') ✅ IP $IP débloquée après $DURATION secondes." >> "$LOG_FILE") &
+    fi
+    ;;
+  delete)
+    iptables -D INPUT -s "$IP" -j DROP
+    echo "$(date '+%F %T') 🗑️ IP $IP débloquée manuellement." >> "$LOG_FILE"
+    ;;
+  *)
+    echo "$(date '+%F %T') ⚠️ Action inconnue ($ACTION), sortie." >> "$LOG_FILE"
+    exit 1
+    ;;
+esac
+
+exit 0
