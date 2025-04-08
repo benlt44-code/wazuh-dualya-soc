@@ -1,0 +1,350 @@
+<ossec_config>
+
+  <!-- Global configuration -->
+  <global>
+    <jsonout_output>yes</jsonout_output>
+    <alerts_log>yes</alerts_log>
+    <logall>no</logall>
+    <logall_json>no</logall_json>
+    <email_notification>no</email_notification>
+    <smtp_server>smtp.example.wazuh.com</smtp_server>
+    <email_from>wazuh@example.wazuh.com</email_from>
+    <email_to>recipient@example.wazuh.com</email_to>
+    <email_maxperhour>12</email_maxperhour>
+    <email_log_source>alerts.log</email_log_source>
+    <agents_disconnection_time>10m</agents_disconnection_time>
+    <agents_disconnection_alert_time>0</agents_disconnection_alert_time>
+    <update_check>yes</update_check>
+    <white_list>127.0.0.1</white_list>
+    <white_list>^localhost.localdomain$</white_list>
+    <white_list>10.0.10.11</white_list>
+    <white_list>10.0.10.12</white_list>
+  </global>
+
+  <!-- Alerting -->
+  <alerts>
+    <log_alert_level>3</log_alert_level>
+    <email_alert_level>12</email_alert_level>
+  </alerts>
+
+  <!-- Logging format -->
+  <logging>
+    <log_format>plain</log_format>
+  </logging>
+
+  <!-- Remote connection for agents -->
+  <remote>
+    <connection>secure</connection>
+    <port>1514</port>
+    <protocol>tcp</protocol>
+    <queue_size>131072</queue_size>
+  </remote>
+
+
+  <!-- Clustering -->
+  <cluster>
+    <name>wazuh</name>
+    <node_name>node01</node_name>
+    <node_type>master</node_type>
+    <key></key>
+    <port>1516</port>
+    <bind_addr>0.0.0.0</bind_addr>
+    <nodes>
+      <node>NODE_IP</node>
+    </nodes>
+    <hidden>no</hidden>
+    <disabled>yes</disabled>
+  </cluster>
+
+  <!-- Rootcheck -->
+  <rootcheck>
+    <disabled>no</disabled>
+    <check_files>yes</check_files>
+    <check_trojans>yes</check_trojans>
+    <check_dev>yes</check_dev>
+    <check_sys>yes</check_sys>
+    <check_pids>yes</check_pids>
+    <check_ports>yes</check_ports>
+    <check_if>yes</check_if>
+    <frequency>43200</frequency>
+    <rootkit_files>etc/rootcheck/rootkit_files.txt</rootkit_files>
+    <rootkit_trojans>etc/rootcheck/rootkit_trojans.txt</rootkit_trojans>
+    <skip_nfs>yes</skip_nfs>
+  </rootcheck>
+
+  <!-- File Integrity Monitoring -->
+  <syscheck>
+    <disabled>no</disabled>
+    <frequency>43200</frequency>
+    <scan_on_start>yes</scan_on_start>
+    <alert_new_files>yes</alert_new_files>
+    <auto_ignore frequency="10" timeframe="3600">no</auto_ignore>
+    <directories>/etc,/usr/bin,/usr/sbin,/bin,/sbin,/boot</directories>
+    <ignore>/etc/mtab</ignore>
+    <ignore>/etc/hosts.deny</ignore>
+    <ignore>/etc/random-seed</ignore>
+    <ignore type="sregex">.log$|.swp$</ignore>
+    <nodiff>/etc/ssl/private.key</nodiff>
+    <skip_nfs>yes</skip_nfs>
+    <skip_dev>yes</skip_dev>
+    <skip_proc>yes</skip_proc>
+    <skip_sys>yes</skip_sys>
+    <process_priority>10</process_priority>
+    <max_eps>50</max_eps>
+    <synchronization>
+      <enabled>yes</enabled>
+      <interval>5m</interval>
+      <max_eps>10</max_eps>
+    </synchronization>
+  </syscheck>
+
+  <!-- Security Configuration Assessment -->
+  <sca>
+    <enabled>yes</enabled>
+    <scan_on_start>yes</scan_on_start>
+    <interval>12h</interval>
+    <skip_nfs>yes</skip_nfs>
+  </sca>
+
+  <!-- Vulnerability detection -->
+  <vulnerability-detection>
+    <enabled>yes</enabled>
+    <index-status>yes</index-status>
+    <feed-update-interval>60m</feed-update-interval>
+  </vulnerability-detection>
+
+  <!-- Indexer -->
+  <indexer>
+    <enabled>yes</enabled>
+    <hosts>
+      <host>https://127.0.0.1:9200</host>
+    </hosts>
+    <ssl>
+      <certificate_authorities>
+        <ca>/etc/filebeat/certs/root-ca.pem</ca>
+      </certificate_authorities>
+      <certificate>/etc/filebeat/certs/wazuh-server.pem</certificate>
+      <key>/etc/filebeat/certs/wazuh-server-key.pem</key>
+    </ssl>
+  </indexer>
+
+  <!-- System inventory collection -->
+  <wodle name="syscollector">
+    <disabled>no</disabled>
+    <interval>1h</interval>
+    <scan_on_start>yes</scan_on_start>
+    <hardware>yes</hardware>
+    <os>yes</os>
+    <network>yes</network>
+    <packages>yes</packages>
+    <ports all="no">yes</ports>
+    <processes>yes</processes>
+    <synchronization>
+      <max_eps>10</max_eps>
+    </synchronization>
+  </wodle>
+
+  <!-- Active response commands -->
+  <command>
+    <name>disable-account</name>
+    <executable>disable-account</executable>
+    <timeout_allowed>yes</timeout_allowed>
+  </command>
+  <command>
+    <name>restart-wazuh</name>
+    <executable>restart-wazuh</executable>
+  </command>
+  <command>
+    <name>firewall-drop</name>
+    <executable>firewall_Full</executable>
+    <timeout_allowed>yes</timeout_allowed>
+  </command>
+  <command>
+    <name>host-deny</name>
+    <executable>host-deny</executable>
+    <timeout_allowed>yes</timeout_allowed>
+  </command>
+  <command>
+    <name>route-null</name>
+    <executable>route-null</executable>
+    <timeout_allowed>yes</timeout_allowed>
+  </command>
+  <command>
+    <name>win_route-null</name>
+    <executable>route-null.exe</executable>
+    <timeout_allowed>yes</timeout_allowed>
+  </command>
+  <command>
+    <name>netsh</name>
+    <executable>netsh.exe</executable>
+    <timeout_allowed>yes</timeout_allowed>
+  </command>
+  <command>
+    <name>slack_notify</name>
+    <executable>slack_notify</executable>
+    <timeout_allowed>no</timeout_allowed>
+  </command>
+
+  <command>
+    <name>drop-switch-port</name>
+    <executable>drop-switch-port</executable>
+    <timeout_allowed>yes</timeout_allowed>
+  </command>
+
+
+  <command>
+    <name>restart-service</name>
+    <executable>restart-service</executable>
+    <timeout_allowed>yes</timeout_allowed>
+  </command>
+<!-- ===================== ACTIVE RESPONSE DEFINITIONS ===================== -->
+
+  <!-- Brute force / Flood IP blocking on Linux -->
+  <active-response>
+    <command>firewall-drop</command>
+    <location>local</location>
+    <rules_id>100506,100901,101002,5763</rules_id>
+    <timeout>600</timeout>
+  </active-response>
+
+  <!-- Host deny for Linux fallback -->
+  <active-response>
+    <command>host-deny</command>
+    <location>local</location>
+    <rules_id>5763</rules_id>
+    <timeout>600</timeout>
+  </active-response>
+
+  <!-- Brute force on Windows account -->
+  <active-response>
+    <command>disable-account</command>
+    <location>local</location>
+    <rules_id>100901</rules_id>
+  </active-response>
+
+  <!-- Drop route/null on Windows for malicious IPs -->
+  <active-response>
+    <command>route-null</command>
+    <location>local</location>
+    <rules_id>100506</rules_id>
+    <timeout>600</timeout>
+  </active-response>
+
+  <!-- Restart Docker, nginx, Vaultwarden, Apache, etc. -->
+  <active-response>
+    <command>restart-service</command>
+    <location>local</location>
+    <rules_id>100600,100505,100601</rules_id>
+  </active-response>
+
+  <!-- Restart wazuh agent on Windows -->
+  <active-response>
+    <command>restart-wazuh</command>
+    <location>local</location>
+    <rules_id>100400</rules_id>
+  </active-response>
+
+  <!-- STP flood / switch storm -->
+  <active-response>
+    <command>drop-switch-port</command>
+    <location>server</location>
+    <rules_id>101101</rules_id>
+  </active-response>
+
+  <!-- Slack notification for critical rules -->
+  <active-response>
+    <command>slack_notify</command>
+    <location>server</location>
+    <rules_id>100505,100901,100506,101002,101101,100301,100400,100601,5763</rules_id>
+  </active-response>
+
+  <!-- Log sources -->
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/syslog/10.0.40.1/*.log</location>
+  </localfile>
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/syslog/10.0.40.2/*.log</location>
+  </localfile>
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/syslog/vcsa/*.log</location>
+  </localfile>
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/wazuh/syslog/opnsense01.dualya.local/*.log</location>
+  </localfile>
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/wazuh/syslog/opnsense02.dualya.local/*.log</location>
+  </localfile>
+  <!-- Logs for services running on the Wazuh manager -->
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/syslog</location>
+  </localfile>
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/auth.log</location>
+  </localfile>
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/dpkg.log</location>
+  </localfile>
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/zabbix/zabbix_agentd.log</location>
+  </localfile>
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/glpi-agent/glpi-agent.log</location>
+  </localfile>
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/wazuh-indexer/*.log</location>
+  </localfile>
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/wazuh-dashboard/*.log</location>
+  </localfile>
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/ossec/logs/active-responses.log</location>
+  </localfile>
+  <localfile>
+    <log_format>journald</log_format>
+    <location>journald</location>
+  </localfile>
+
+<ruleset>
+  <!-- Répertoires des décoders et règles -->
+  <decoder_dir>ruleset/decoders</decoder_dir>
+  <rule_dir>ruleset/rules</rule_dir>
+
+  <!-- Répertoires personnalisés (custom) -->
+  <decoder_dir>etc/decoders</decoder_dir>
+  <rule_dir>etc/rules</rule_dir>
+
+  <!-- Règles à exclure (trop bruyantes / inadaptées à ton contexte) -->
+  <rule_exclude>0215-policy_rules.xml</rule_exclude>
+  <rule_exclude>0510-audit_rules.xml</rule_exclude>
+  <rule_exclude>0515-audit_watch_rules.xml</rule_exclude>
+  <rule_exclude>0560-systemd_rules.xml</rule_exclude>
+
+  <!-- Listes CDB utilisées dans les règles -->
+  <list>etc/lists/audit-keys</list>
+  <list>etc/lists/amazon/aws-eventnames</list>
+  <list>etc/lists/security-eventchannel</list>
+</ruleset>
+
+<rule_test>
+  <enabled>yes</enabled>
+  <threads>2</threads>
+  <max_sessions>64</max_sessions>
+  <session_timeout>15m</session_timeout>
+</rule_test>
+
+
+
+</ossec_config>
