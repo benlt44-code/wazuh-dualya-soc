@@ -1,0 +1,2 @@
+# wazuh-dualya-soc
+Annexes 
