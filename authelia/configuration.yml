@@ -1,0 +1,63 @@
+server:
+  address: tcp://127.0.0.1:9091
+
+log:
+  level: info
+
+authentication_backend:
+  ldap:
+    implementation: custom
+    address: ldap://dc01.dualya.local
+    timeout: 5s
+    start_tls: false
+    base_dn: dc=dualya,dc=local
+    additional_users_dn: OU=Compte_Administrateur,OU=Administration
+    additional_groups_dn: OU=Wazuh,OU=Application,OU=Groupes
+    user: "cn=Administrateur,cn=users,dc=dualya,dc=local"
+    password: "MDPadmin44"
+    users_filter: "(&(objectClass=person)({username_attribute}={input}))"
+    groups_filter: "(&(objectClass=group)(member={dn}))"
+    attributes:
+      username: sAMAccountName
+      display_name: cn
+      mail: mail
+      group_name: cn
+
+access_control:
+  default_policy: deny
+  rules:
+    - domain: wazuh.dualya.local
+      policy: two_factor
+      subject:
+        - "group:GS_Admin_Wazuh"
+
+session:
+  secret: "eb53c5be1f71fdebe534384da776fd875a2dd0653c715439bf5295bc53c5b794"
+  expiration: 1h
+  inactivity: 10m
+  cookies:
+    - name: authelia_session
+      domain: dualya.local
+      authelia_url: https://auth.dualya.local
+      default_redirection_url: https://wazuh.dualya.local
+      same_site: lax
+
+storage:
+  encryption_key: "2f4323ed429100115a5bfda156f0ab67283b8e0952e698901e6d4bc73ed788fc"
+  local:
+    path: /var/lib/authelia/db.sqlite3
+
+notifier:
+  filesystem:
+    filename: /var/lib/authelia/notifications.txt
+
+totp:
+  issuer: "dualya-wazuh"
+  period: 30
+  skew: 1
+  digits: 6
+  algorithm: sha1
+
+identity_validation:
+  reset_password:
+    jwt_secret: "f4c6bd9a8e9e4282bc2633f5c9a8e2471b34de3a7cf2ee3a840ad7cb42b78b15"
