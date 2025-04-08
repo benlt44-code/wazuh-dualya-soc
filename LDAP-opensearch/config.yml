@@ -1,0 +1,181 @@
+---
+
+_meta:
+  type: "config"
+  config_version: 2
+
+config:
+  dynamic:
+    # Set filtered_alias_mode to 'disallow' to forbid more than 2 filtered aliases per index
+    # Set filtered_alias_mode to 'warn' to allow more than 2 filtered aliases per index but warns about it (default)
+    # Set filtered_alias_mode to 'nowarn' to allow more than 2 filtered aliases per index silently
+    #filtered_alias_mode: warn
+    #do_not_fail_on_forbidden: false
+    #kibana:
+    # Kibana multitenancy
+    #multitenancy_enabled: true
+    #private_tenant_enabled: true
+    #default_tenant: ""
+    #server_username: kibanaserver
+    #index: '.kibana'
+    http:
+      anonymous_auth_enabled: false
+      xff:
+        enabled: false
+        internalProxies: '192\.168\.0\.10|192\.168\.0\.11' # regex pattern
+        #internalProxies: '.*' # trust all internal proxies, regex pattern
+        #remoteIpHeader:  'x-forwarded-for'
+        ###### see https://docs.oracle.com/javase/7/docs/api/java/util/regex/Pattern.html for regex help
+        ###### more information about XFF https://en.wikipedia.org/wiki/X-Forwarded-For
+        ###### and here https://tools.ietf.org/html/rfc7239
+        ###### and https://tomcat.apache.org/tomcat-8.0-doc/config/valve.html#Remote_IP_Valve
+    authc:
+      kerberos_auth_domain:
+        http_enabled: false
+        transport_enabled: false
+        order: 6
+        http_authenticator:
+          type: kerberos
+          challenge: true
+          config:
+            # If true a lot of kerberos/security related debugging output will be logged to standard out
+            krb_debug: false
+            # If true then the realm will be stripped from the user name
+            strip_realm_from_principal: true
+        authentication_backend:
+          type: noop
+      basic_internal_auth_domain:
+        description: "Authenticate via HTTP Basic against internal users database"
+        http_enabled: true
+        transport_enabled: true
+        order: 4
+        http_authenticator:
+          type: basic
+          challenge: true
+        authentication_backend:
+          type: intern
+      proxy_auth_domain:
+        description: "Authenticate via proxy"
+        http_enabled: false
+        transport_enabled: false
+        order: 3
+        http_authenticator:
+          type: proxy
+          challenge: false
+          config:
+            user_header: "x-proxy-user"
+            roles_header: "x-proxy-roles"
+        authentication_backend:
+          type: noop
+      jwt_auth_domain:
+        description: "Authenticate via Json Web Token"
+        http_enabled: false
+        transport_enabled: false
+        order: 0
+        http_authenticator:
+          type: jwt
+          challenge: false
+          config:
+            signing_key: "base64 encoded HMAC key or public RSA/ECDSA pem key"
+            jwt_header: "Authorization"
+            jwt_url_parameter: null
+            jwt_clock_skew_tolerance_seconds: 30
+            roles_key: null
+            subject_key: null
+        authentication_backend:
+          type: noop
+      clientcert_auth_domain:
+        description: "Authenticate via SSL client certificates"
+        http_enabled: false
+        transport_enabled: false
+        order: 2
+        http_authenticator:
+          type: clientcert
+          config:
+            username_attribute: cn #optional, if omitted DN becomes username
+          challenge: false
+        authentication_backend:
+          type: noop
+      ldap:
+        description: "Authenticate via LDAP or Active Directory"
+        http_enabled: true
+        transport_enabled: false
+        order: 5
+        http_authenticator:
+          type: basic
+          challenge: false
+        authentication_backend:
+          # LDAP authentication backend (authenticate users against a LDAP or Active Directory)
+          type: ldap
+          config:
+            # enable ldaps
+            enable_ssl: false
+            # enable start tls, enable_ssl should be false
+            enable_start_tls: false
+            # send client certificate
+            enable_ssl_client_auth: false
+            # verify ldap hostname
+            verify_hostnames: true
+            hosts:
+            - dc01.dualya.local:389
+            - dc02.dualya.local:389
+            bind_dn: "CN=Ldap Wazuh,OU=Compte_Service,OU=Administration,DC=dualya,DC=local"
+            password: "Bes@fe2024.."
+            userbase: 'OU=Compte_Administrateur,OU=Administration,DC=dualya,DC=local'
+            # Filter to search for users (currently in the whole subtree beneath userbase)
+            # {0} is substituted with the username
+            usersearch: '(sAMAccountName={0})'
+            # Use this attribute from the user as username (if not set then DN is used)
+            username_attribute: sAMAccountName
+    authz:
+      roles_from_myldap:
+        description: "Authorize via LDAP or Active Directory"
+        http_enabled: true
+        transport_enabled: false
+        authorization_backend:
+          # LDAP authorization backend (gather roles from a LDAP or Active Directory, you have to configure the above LDAP authentication backend settings too)
+          type: ldap
+          config:
+            enable_ssl: false
+            enable_start_tls: false
+            enable_ssl_client_auth: false
+            verify_hostnames: false
+            hosts:
+              - dc01.dualya.local:389
+              - dc02.dualya.local:389
+            bind_dn: "CN=Ldap Wazuh,OU=Compte_Service,OU=Administration,DC=dualya,DC=local"
+            password: "Bes@fe2024.."
+            rolebase: "OU=Groupes,DC=dualya,DC=local"
+            rolesearch: '(member={0})'
+            userrolename: disabled
+            rolename: cn
+            resolve_nested_roles: true
+            userbase: "OU=Compte_Administrateur,OU=Administration,DC=dualya,DC=local"
+            usersearch: '(sAMAccountName={0})'
+            username_attribute: sAMAccountName
+            skip_users:
+              - admin
+              - kibanaserver
+      roles_from_another_ldap:
+        description: "Authorize via another Active Directory"
+        http_enabled: false
+        transport_enabled: false
+        authorization_backend:
+          type: ldap
+          #config goes here ...
+  #    auth_failure_listeners:
+  #      ip_rate_limiting:
+  #        type: ip
+  #        allowed_tries: 10
+  #        time_window_seconds: 3600
+  #        block_expiry_seconds: 600
+  #        max_blocked_clients: 100000
+  #        max_tracked_clients: 100000
+  #      internal_authentication_backend_limiting:
+  #        type: username
+  #        authentication_backend: intern
+  #        allowed_tries: 10
+  #        time_window_seconds: 3600
+  #        block_expiry_seconds: 600
+  #        max_blocked_clients: 100000
+  #        max_tracked_clients: 100000
