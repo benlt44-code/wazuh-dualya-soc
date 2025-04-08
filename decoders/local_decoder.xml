@@ -1,0 +1,194 @@
+<!-- Local Decoders -->
+
+<!-- Modify it at your will. -->
+<!-- Copyright (C) 2015, Wazuh Inc. -->
+
+<!--
+  - Allowed static fields:
+  - location   - where the log came from (only on FTS)
+  - srcuser    - extracts the source username
+  - dstuser    - extracts the destination (target) username
+  - user       - an alias to dstuser (only one of the two can be used)
+  - srcip      - source ip
+  - dstip      - dst ip
+  - srcport    - source port
+  - dstport    - destination port
+  - protocol   - protocol
+  - id         - event id
+  - url        - url of the event
+  - action     - event action (deny, drop, accept, etc)
+  - status     - event status (success, failure, etc)
+  - extra_data - Any extra data
+-->
+
+ <!-- OPNsense Decoders -->
+
+  <!-- OPNsense Firewall Log -->
+  <decoder name="opnsense_firewall_custom">
+    <program_name>firewall</program_name>
+    <regex type="pcre2">^(.*)$</regex>
+    <order>extra_data</order>
+  </decoder>
+
+  <!-- OPNsense Charon (IPsec VPN) Decoder -->
+  <decoder name="opnsense_charon">
+    <program_name>charon</program_name>
+    <regex type="pcre2">^\d+\[\w+\]\s+(.*)$</regex>
+    <order>message</order>
+  </decoder>
+
+  <!-- OPNsense DHCP Relay Decoder -->
+  <decoder name="opnsense_dhcrelay">
+    <program_name>dhcrelay</program_name>
+    <regex type="pcre2">^(forwarded|received)\s+(\w+)\s+for\s+(\S+)\s+to\s+(\S+)$</regex>
+    <order>action, protocol, srcmac, dstip</order>
+  </decoder>
+
+  <!-- OPNsense Lighttpd (Web Server) Decoder -->
+  <decoder name="opnsense_lighttpd">
+    <program_name>lighttpd</program_name>
+    <regex type="pcre2">^(\S+)\s+(\S+)\s+-\s+\[(.+?)\]\s+\"(\w+)\s+(\S+)\s+(\S+)\"\s+(\d+)\s+(\d+)\s+\"([^\"]*)\"\s+\"([^\"]*)\"$</regex>
+    <order>srcip, hostname, timestamp, method, url, protocol, status, size, referer, user_agent</order>
+  </decoder>
+
+  <!-- OPNsense Configd.py (Configuration Daemon) Decoder -->
+  <decoder name="opnsense_configd">
+    <program_name>configd.py</program_name>
+    <regex type="pcre2">^message\s+(\S+)\s+\[.*\]\s+(.*)$</regex>
+    <order>message_id, result</order>
+  </decoder>
+
+<!-- VCSA Decoders -->
+
+  <!-- VCSA Auditd Decoder -->
+  <decoder name="vcsa_auditd">
+    <program_name>auditd</program_name>
+    <regex type="pcre2">^(.*)$</regex>
+    <order>message</order>
+  </decoder>
+
+  <!-- VCSA VCSA-Audit Decoder -->
+  <decoder name="vcsa_vcsa_audit">
+    <program_name>vcsa-audit</program_name>
+    <regex type="pcre2">type=(\w+)\s+msg=audit\((.*?)\):\s+(.*)$</regex>
+    <order>audit_type, audit_msg, details</order>
+  </decoder>
+
+<!-- VCSA Sudo Decoder -->
+  <decoder name="vcsa_sudo_session">
+    <prematch type="pcre2">pam_unix\(sudo:session\): session (opened|closed) for user</prematch>
+    <regex type="pcre2">pam_unix\(sudo:session\): session (opened|closed) for user (\w+)</regex>
+    <order>action, user</order>
+  </decoder>
+
+  <decoder name="vcsa_sudo_command">
+    <prematch type="pcre2">\ssudo\s+\w+\s+:\s+PWD=</prematch>
+    <regex type="pcre2">sudo\s+(\w+)\s+:\s+PWD=.*?;\s+USER=(\w+)\s+;\s+COMMAND=(.+)$</regex>
+    <order>srcuser, runuser, command</order>
+  </decoder>
+
+  <!-- VCSA Firewall Reload Decoder -->
+  <decoder name="vcsa_firewall_reload">
+    <program_name>firewall-reload</program_name>
+    <regex type="pcre2">^(.*)$</regex>
+    <order>message</order>
+  </decoder>
+
+  <!-- VCSA Likewise Decoder -->
+  <decoder name="vcsa_likewise">
+    <program_name>likewise</program_name>
+    <regex type="pcre2">^.*INFO\s+(.*)$</regex>
+    <order>message</order>
+  </decoder>
+
+  <!-- VCSA Tokenservice Decoder -->
+  <decoder name="vcsa_tokenservice">
+    <program_name>tokenservice</program_name>
+    <regex type="pcre2">^(.*)$</regex>
+    <order>message</order>
+  </decoder>
+
+  <!-- VCSA Certificate Management Runtime Decoder -->
+  <decoder name="vcsa_certificatemanagement_runtime">
+    <program_name>certificatemanagement-runtime</program_name>
+    <regex type="pcre2">^(.*)$</regex>
+    <order>message</order>
+  </decoder>
+
+  <!-- VCSA Certificate Management Svcs Decoder -->
+  <decoder name="vcsa_certificatemanagement_svcs">
+    <program_name>certificatemanagement-svcs</program_name>
+    <regex type="pcre2">^(.*)$</regex>
+    <order>message</order>
+  </decoder>
+
+
+<!-- Custom Decoders for Zabbix and Grafana -->
+
+<!-- Decoder for Zabbix server logs: "cannot send list of active checks to ..." -->
+<decoder name="zabbix_server_checks">
+  <prematch type="pcre2">^[0-9]+:[0-9]+:</prematch>
+  <regex type="pcre2">^[0-9]+:[0-9]+:[0-9]+\.[0-9]+ cannot send list of active checks to \"(.*?)\": host \[(.*?)\] not found</regex>
+  <order>dstip, dstuser</order>
+</decoder>
+
+<!-- Decoder for Zabbix agent errors: "no active checks on server..." -->
+<decoder name="zabbix_agent_check_error">
+  <prematch type="pcre2">^[0-9]+:[0-9]+:</prematch>
+  <regex type="pcre2">^[0-9]+:[0-9]+:[0-9]+\.[0-9]+ no active checks on server \[(.*?)\]: host \[(.*?)\] not found</regex>
+  <order>srcip, dstuser</order>
+</decoder>
+
+<!-- Decoder for Zabbix item failure: "Zabbix agent item ... failed..." -->
+<decoder name="zabbix_agent_item_failure">
+  <prematch type="pcre2">Zabbix agent item</prematch>
+  <regex type="pcre2">Zabbix agent item \"(.*?)\" on host \"(.*?)\" failed: (.*)</regex>
+  <order>extra_data, dstuser, message</order>
+</decoder>
+
+<!-- Decoder for Grafana logs: "logger=... level=info msg=..." -->
+<decoder name="grafana_logger">
+  <prematch type="pcre2">logger=</prematch>
+  <regex type="pcre2">logger=(\S+) t=(.*?) level=(\S+) msg=\"(.*?)\".*</regex>
+  <order>program_name, timestamp, status, message</order>
+</decoder>
+
+<!-- Custom Decoders for Haproxy -->
+<decoder name="haproxy_custom">
+  <program_name type="pcre2">haproxy</program_name>
+  <regex type="pcre2">
+    ^(\d{1,3}(?:\.\d{1,3}){3}):(\d+)\s+\[([^\]]+)\]\s+(\S+)\s+([^/]+)/(\S+)\s+\d+/\d+/\d+/\d+/\d+\s+(\d+)\s+(\d+)\s+-\s+-\s+--\w+\s+\d+/\d+/\d+/\d+/\d+\s+\d+/\d+\s+"(\S+)\s+(\S+)\s+(HTTP/\d\.\d)"
+  </regex>
+  <order>srcip, srcport, date, frontend, backend, backend_server, http_code, bytes, method, url, httpversion</order>
+</decoder>
+
+<!-- Décodeurs personnalisés FOG -->
+  <decoder name="fog_generic">
+    <prematch type="pcre2">\[\d{2}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2} (am|pm)\]</prematch>
+    <regex type="pcre2">\[\d{2}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2} (am|pm)\]\s+(\*|\|)\s+(.*)</regex>
+    <order>extra_data</order>
+  </decoder>
+
+  <decoder name="fog_deletequeue">
+    <parent>fog_generic</parent>
+    <regex type="pcre2">\[\d{2}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2} (am|pm)\]\s+\*\s+(\d+) items to delete found\.</regex>
+    <order>extra_data</order>
+  </decoder>
+
+  <decoder name="fog_size">
+    <parent>fog_generic</parent>
+    <regex type="pcre2">\[\d{2}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2} (am|pm)\]\s+\|\s+Size:\s+(\d+)</regex>
+    <order>extra_data</order>
+  </decoder>
+
+  <decoder name="fog_nosync">
+    <parent>fog_generic</parent>
+    <regex type="pcre2">\[\d{2}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2} (am|pm)\]\s+\|\s+There are no members to sync to</regex>
+    <order>extra_data</order>
+  </decoder>
+
+  <decoder name="fog_starting_service">
+    <parent>fog_generic</parent>
+    <regex type="pcre2">\[\d{2}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2} (am|pm)\]\s+\*\s+Starting service loop</regex>
+    <order>extra_data</order>
+  </decoder>
