@@ -1,0 +1,448 @@
+<!-- Local Decoders -->
+
+<!-- Modify it at your will. -->
+<!-- Copyright (C) 2015, Wazuh Inc. -->
+
+<!--
+  - Allowed static fields:
+  - location   - where the log came from (only on FTS)
+  - srcuser    - extracts the source username
+  - dstuser    - extracts the destination (target) username
+  - user       - an alias to dstuser (only one of the two can be used)
+  - srcip      - source ip
+  - dstip      - dst ip
+  - srcport    - source port
+  - dstport    - destination port
+  - protocol   - protocol
+  - id         - event id
+  - url        - url of the event
+  - action     - event action (deny, drop, accept, etc)
+  - status     - event status (success, failure, etc)
+  - extra_data - Any extra data
+-->
+
+ <!-- OPNsense Decoders -->
+
+  <!-- OPNsense Firewall Log -->
+  <decoder name="opnsense_firewall_custom">
+    <program_name>firewall</program_name>
+    <regex type="pcre2">^(.*)$</regex>
+    <order>extra_data</order>
+  </decoder>
+
+  <!-- OPNsense Charon (IPsec VPN) Decoder -->
+  <decoder name="opnsense_charon">
+    <program_name>charon</program_name>
+    <regex type="pcre2">^\d+\[\w+\]\s+(.*)$</regex>
+    <order>message</order>
+  </decoder>
+
+  <!-- OPNsense DHCP Relay Decoder -->
+  <decoder name="opnsense_dhcrelay">
+    <program_name>dhcrelay</program_name>
+    <regex type="pcre2">^(forwarded|received)\s+(\w+)\s+for\s+(\S+)\s+to\s+(\S+)$</regex>
+    <order>action, protocol, srcmac, dstip</order>
+  </decoder>
+
+  <!-- OPNsense Lighttpd (Web Server) Decoder -->
+  <decoder name="opnsense_lighttpd">
+    <program_name>lighttpd</program_name>
+    <regex type="pcre2">^(\S+)\s+(\S+)\s+-\s+\[(.+?)\]\s+\"(\w+)\s+(\S+)\s+(\S+)\"\s+(\d+)\s+(\d+)\s+\"([^\"]*)\"\s+\"([^\"]*)\"$</regex>
+    <order>srcip, hostname, timestamp, method, url, protocol, status, size, referer, user_agent</order>
+  </decoder>
+
+  <!-- OPNsense Configd.py (Configuration Daemon) Decoder -->
+  <decoder name="opnsense_configd">
+    <program_name>configd.py</program_name>
+    <regex type="pcre2">^message\s+(\S+)\s+\[.*\]\s+(.*)$</regex>
+    <order>message_id, result</order>
+  </decoder>
+
+<!-- VCSA Decoders -->
+
+  <!-- VCSA Auditd Decoder -->
+  <decoder name="vcsa_auditd">
+    <program_name>auditd</program_name>
+    <regex type="pcre2">^(.*)$</regex>
+    <order>message</order>
+  </decoder>
+
+  <!-- VCSA VCSA-Audit Decoder -->
+  <decoder name="vcsa_vcsa_audit">
+    <program_name>vcsa-audit</program_name>
+    <regex type="pcre2">type=(\w+)\s+msg=audit\((.*?)\):\s+(.*)$</regex>
+    <order>audit_type, audit_msg, details</order>
+  </decoder>
+
+<!-- VCSA Sudo Decoder -->
+  <decoder name="vcsa_sudo_session">
+    <prematch type="pcre2">pam_unix\(sudo:session\): session (opened|closed) for user</prematch>
+    <regex type="pcre2">pam_unix\(sudo:session\): session (opened|closed) for user (\w+)</regex>
+    <order>action, user</order>
+  </decoder>
+
+  <decoder name="vcsa_sudo_command">
+    <prematch type="pcre2">\ssudo\s+\w+\s+:\s+PWD=</prematch>
+    <regex type="pcre2">sudo\s+(\w+)\s+:\s+PWD=.*?;\s+USER=(\w+)\s+;\s+COMMAND=(.+)$</regex>
+    <order>srcuser, runuser, command</order>
+  </decoder>
+
+  <!-- VCSA Firewall Reload Decoder -->
+  <decoder name="vcsa_firewall_reload">
+    <program_name>firewall-reload</program_name>
+    <regex type="pcre2">^(.*)$</regex>
+    <order>message</order>
+  </decoder>
+
+  <!-- VCSA Likewise Decoder -->
+  <decoder name="vcsa_likewise">
+    <program_name>likewise</program_name>
+    <regex type="pcre2">^.*INFO\s+(.*)$</regex>
+    <order>message</order>
+  </decoder>
+
+  <!-- VCSA Tokenservice Decoder -->
+  <decoder name="vcsa_tokenservice">
+    <program_name>tokenservice</program_name>
+    <regex type="pcre2">^(.*)$</regex>
+    <order>message</order>
+  </decoder>
+
+  <!-- VCSA Certificate Management Runtime Decoder -->
+  <decoder name="vcsa_certificatemanagement_runtime">
+    <program_name>certificatemanagement-runtime</program_name>
+    <regex type="pcre2">^(.*)$</regex>
+    <order>message</order>
+  </decoder>
+
+  <!-- VCSA Certificate Management Svcs Decoder -->
+  <decoder name="vcsa_certificatemanagement_svcs">
+    <program_name>certificatemanagement-svcs</program_name>
+    <regex type="pcre2">^(.*)$</regex>
+    <order>message</order>
+  </decoder>
+
+
+<!-- Custom Decoders for Zabbix and Grafana -->
+
+<!-- Decoder for Zabbix server logs: "cannot send list of active checks to ..." -->
+<decoder name="zabbix_server_checks">
+  <prematch type="pcre2">^[0-9]+:[0-9]+:</prematch>
+  <regex type="pcre2">^[0-9]+:[0-9]+:[0-9]+\.[0-9]+ cannot send list of active checks to \"(.*?)\": host \[(.*?)\] not found</regex>
+  <order>dstip, dstuser</order>
+</decoder>
+
+<!-- Decoder for Zabbix agent errors: "no active checks on server..." -->
+<decoder name="zabbix_agent_check_error">
+  <prematch type="pcre2">^[0-9]+:[0-9]+:</prematch>
+  <regex type="pcre2">^[0-9]+:[0-9]+:[0-9]+\.[0-9]+ no active checks on server \[(.*?)\]: host \[(.*?)\] not found</regex>
+  <order>srcip, dstuser</order>
+</decoder>
+
+<!-- Decoder for Zabbix item failure: "Zabbix agent item ... failed..." -->
+<decoder name="zabbix_agent_item_failure">
+  <prematch type="pcre2">Zabbix agent item</prematch>
+  <regex type="pcre2">Zabbix agent item \"(.*?)\" on host \"(.*?)\" failed: (.*)</regex>
+  <order>extra_data, dstuser, message</order>
+</decoder>
+
+<!-- Decoder for Grafana logs: "logger=... level=info msg=..." -->
+<decoder name="grafana_logger">
+  <prematch type="pcre2">logger=</prematch>
+  <regex type="pcre2">logger=(\S+) t=(.*?) level=(\S+) msg=\"(.*?)\".*</regex>
+  <order>program_name, timestamp, status, message</order>
+</decoder>
+
+<!-- Custom Decoders for Haproxy -->
+<decoder name="haproxy_custom">
+  <program_name type="pcre2">haproxy</program_name>
+  <regex type="pcre2">
+    ^(\d{1,3}(?:\.\d{1,3}){3}):(\d+)\s+\[([^\]]+)\]\s+(\S+)\s+([^/]+)/(\S+)\s+\d+/\d+/\d+/\d+/\d+\s+(\d+)\s+(\d+)\s+-\s+-\s+--\w+\s+\d+/\d+/\d+/\d+/\d+\s+\d+/\d+\s+"(\S+)\s+(\S+)\s+(HTTP/\d\.\d)"
+  </regex>
+  <order>srcip, srcport, date, frontend, backend, backend_server, http_code, bytes, method, url, httpversion</order>
+</decoder>
+
+<!-- Décodeurs personnalisés FOG -->
+  <decoder name="fog_generic">
+    <prematch type="pcre2">\[\d{2}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2} (am|pm)\]</prematch>
+    <regex type="pcre2">\[\d{2}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2} (am|pm)\]\s+(\*|\|)\s+(.*)</regex>
+    <order>extra_data</order>
+  </decoder>
+
+  <decoder name="fog_deletequeue">
+    <parent>fog_generic</parent>
+    <regex type="pcre2">\[\d{2}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2} (am|pm)\]\s+\*\s+(\d+) items to delete found\.</regex>
+    <order>extra_data</order>
+  </decoder>
+
+  <decoder name="fog_size">
+    <parent>fog_generic</parent>
+    <regex type="pcre2">\[\d{2}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2} (am|pm)\]\s+\|\s+Size:\s+(\d+)</regex>
+    <order>extra_data</order>
+  </decoder>
+
+  <decoder name="fog_nosync">
+    <parent>fog_generic</parent>
+    <regex type="pcre2">\[\d{2}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2} (am|pm)\]\s+\|\s+There are no members to sync to</regex>
+    <order>extra_data</order>
+  </decoder>
+
+  <decoder name="fog_starting_service">
+    <parent>fog_generic</parent>
+    <regex type="pcre2">\[\d{2}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2} (am|pm)\]\s+\*\s+Starting service loop</regex>
+    <order>extra_data</order>
+  </decoder>
+
+root@wazuh:/var/log/wazuh# ^C
+root@wazuh:/var/log/wazuh# cat /var/ossec/etc/rules/local_rules.xml
+<!-- ===================== FOG Rules ===================== -->
+  <group name="fog">
+    <rule id="100200" level="3">
+      <decoded_as>fog_starting_service</decoded_as>
+      <description>FOG service started</description>
+      <group>services</group>
+    </rule>
+
+    <rule id="100201" level="5">
+      <decoded_as>fog_deletequeue</decoded_as>
+      <description>FOG delete queue activity</description>
+      <group>maintenance</group>
+    </rule>
+
+    <rule id="100202" level="3">
+      <decoded_as>fog_size</decoded_as>
+      <description>FOG image size log</description>
+      <group>images</group>
+    </rule>
+
+    <rule id="100203" level="4">
+      <decoded_as>fog_nosync</decoded_as>
+      <description>FOG replication: no members to sync</description>
+      <group>sync</group>
+    </rule>
+  </group>
+
+  <!-- ===================== Grafana Rules ===================== -->
+  <group name="grafana">
+    <rule id="100300" level="3">
+      <decoded_as>grafana_logger</decoded_as>
+      <match>info</match>
+      <description>Grafana info event</description>
+      <group>info</group>
+    </rule>
+
+    <rule id="100301" level="7">
+      <decoded_as>grafana_logger</decoded_as>
+      <match>error</match>
+      <description>Grafana error event</description>
+      <group>errors</group>
+      <mitre>
+        <id>T1499</id>
+      </mitre>
+    </rule>
+  </group>
+
+  <!-- ===================== Zabbix Rules ===================== -->
+  <group name="zabbix">
+    <rule id="100400" level="7">
+      <decoded_as>zabbix_agent_item_failure</decoded_as>
+      <description>Zabbix agent item failure</description>
+      <group>errors</group>
+      <mitre>
+        <id>T1526</id>
+      </mitre>
+    </rule>
+
+    <rule id="100401" level="6">
+      <decoded_as>zabbix_server_checks</decoded_as>
+      <description>Zabbix server: host not found for active checks</description>
+      <group>communications</group>
+    </rule>
+
+    <rule id="100402" level="6">
+      <decoded_as>zabbix_agent_check_error</decoded_as>
+      <description>Zabbix agent: no active checks on server</description>
+      <group>communications</group>
+    </rule>
+  </group>
+
+  <!-- ===================== HAProxy Rules ===================== -->
+  <group name="haproxy">
+    <rule id="100500" level="5">
+      <decoded_as>haproxy_custom</decoded_as>
+      <description>HAProxy HTTP request log</description>
+      <group>http</group>
+    </rule>
+
+    <rule id="100501" level="7">
+      <decoded_as>haproxy_custom</decoded_as>
+      <match>/login</match>
+      <description>HAProxy access to /login</description>
+      <group>auth</group>
+    </rule>
+
+    <rule id="100506" level="12" frequency="5" timeframe="60">
+      <if_matched_sid>100501</if_matched_sid>
+      <description>HAProxy brute force attempt on /login detected</description>
+      <group>bruteforce,web,</group>
+      <mitre>
+        <id>T1110</id>
+      </mitre>
+    </rule>
+
+    <rule id="100502" level="7">
+      <decoded_as>haproxy_custom</decoded_as>
+      <match>/admin</match>
+      <description>HAProxy access to /admin</description>
+      <group>admin</group>
+    </rule>
+
+    <rule id="100503" level="7">
+      <decoded_as>haproxy_custom</decoded_as>
+      <match>/login|/admin|/log|/logig|/spage 4X|/spage 5X</match>
+      <description>HAProxy sensitive endpoints access</description>
+      <group>monitoring</group>
+    </rule>
+
+    <rule id="100504" level="7">
+      <decoded_as>haproxy_custom</decoded_as>
+      <match>4\d\d</match>
+      <description>HAProxy 4XX error</description>
+      <group>errors</group>
+    </rule>
+
+    <rule id="100505" level="10">
+      <decoded_as>haproxy_custom</decoded_as>
+      <match>5\d\d</match>
+      <description>HAProxy 5XX server error</description>
+      <group>critical</group>
+      <mitre>
+        <id>T1499</id>
+      </mitre>
+    </rule>
+  </group>
+
+  <!-- ===================== Vaultwarden (Docker) ===================== -->
+  <group name="vaultwarden">
+    <rule id="100600" level="3">
+      <program_name>docker</program_name>
+      <match>vaultwarden</match>
+      <description>Vaultwarden log (Docker)</description>
+      <group>docker,auth</group>
+    </rule>
+  </group>
+
+  <!-- ===================== OPNsense Rules ===================== -->
+  <group name="opnsense">
+    <rule id="100700" level="5">
+      <decoded_as>opnsense_firewall_custom</decoded_as>
+      <description>OPNsense Firewall log message</description>
+      <group>firewall</group>
+    </rule>
+
+    <rule id="100701" level="4">
+      <decoded_as>opnsense_charon</decoded_as>
+      <description>OPNsense IPsec VPN activity</description>
+      <group>vpn</group>
+    </rule>
+
+    <rule id="100702" level="4">
+      <decoded_as>opnsense_dhcrelay</decoded_as>
+      <description>OPNsense DHCP relay traffic</description>
+      <group>dhcp</group>
+    </rule>
+
+    <rule id="100703" level="4">
+      <decoded_as>opnsense_lighttpd</decoded_as>
+      <description>OPNsense web access log</description>
+      <group>web</group>
+    </rule>
+  </group>
+
+  <!-- ===================== VCSA Rules ===================== -->
+  <group name="vcsa">
+    <rule id="100800" level="5">
+      <decoded_as>vcsa_sudo_command</decoded_as>
+      <description>VCSA sudo command executed</description>
+      <group>sudo,admin</group>
+    </rule>
+
+    <rule id="100801" level="4">
+      <decoded_as>vcsa_sudo_session</decoded_as>
+      <description>VCSA sudo session open/close</description>
+      <group>sudo</group>
+    </rule>
+
+    <rule id="100802" level="5">
+      <decoded_as>vcsa_firewall_reload</decoded_as>
+      <description>VCSA firewall reload log</description>
+      <group>firewall</group>
+    </rule>
+  </group>
+
+  <!-- ===================== GLPI Rules ===================== -->
+  <group name="glpi">
+    <rule id="100900" level="4">
+      <match>glpi</match>
+      <description>GLPI log matched</description>
+      <group>web</group>
+    </rule>
+
+    <rule id="100901" level="12" frequency="5" timeframe="60">
+      <if_matched_sid>100900</if_matched_sid>
+      <match>/front/login.php</match>
+      <description>GLPI brute force login detected</description>
+      <group>auth,bruteforce</group>
+      <mitre>
+        <id>T1110</id>
+      </mitre>
+    </rule>
+  </group>
+
+  <!-- ===================== Nextcloud Rules ===================== -->
+  <group name="nextcloud">
+    <rule id="101000" level="5">
+      <match>nextcloud</match>
+      <description>Nextcloud activity</description>
+      <group>web</group>
+    </rule>
+
+    <rule id="101001" level="7">
+      <match>ocs/v1.php</match>
+      <description>Nextcloud API access ocs/v1.php</description>
+      <group>api</group>
+      <mitre>
+        <id>T1595</id>
+      </mitre>
+    </rule>
+
+    <rule id="101002" level="12" frequency="8" timeframe="60">
+      <if_matched_sid>101000</if_matched_sid>
+      <match>status.php</match>
+      <description>Nextcloud DoS/flood detected on status.php</description>
+      <group>dos,web</group>
+      <mitre>
+        <id>T1499</id>
+      </mitre>
+    </rule>
+  </group>
+
+  <!-- ===================== Switch Logs Rules ===================== -->
+  <group name="switches">
+    <rule id="101100" level="4">
+      <program_name>syslog</program_name>
+      <match>SW|switch|cisco|port|link|gigabit|fastethernet|trunk|spanning-tree</match>
+      <description>Switch syslog activity</description>
+      <group>network</group>
+    </rule>
+
+    <rule id="101101" level="10" frequency="5" timeframe="30">
+      <if_matched_sid>101100</if_matched_sid>
+      <match>link up|link down|STP change</match>
+      <description>Switch flooding or STP instability detected</description>
+      <group>dos,network</group>
+      <mitre>
+        <id>T1499</id>
+      </mitre>
+    </rule>
+  </group>
