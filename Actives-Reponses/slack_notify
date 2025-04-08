@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# Lecture de l'entrée (stdin)
+read -r INPUT
+
+# Extraction robuste de l'alerte, quelle que soit sa structure
+ALERT=$(echo "$INPUT" | jq -r '.parameters.alert // .alert // empty')
+
+# Si l'alerte est vide ou invalide, on log puis exit proprement
+if [[ -z "$ALERT" || "$ALERT" == "null" ]]; then
+  echo "$(date '+%F %T') | Alerte invalide ou vide" >> /var/ossec/logs/slack_notify.log
+  exit 0
+fi
+
+# Champs standards (fallback en cascade)
+AGENT=$(echo "$ALERT" | jq -r '.agent.name // "Inconnu"')
+SRCIP=$(echo "$ALERT" | jq -r '.data.srcip // .srcip // "Non spécifiée"')
+RULEID=$(echo "$ALERT" | jq -r '.rule.id // "N/A"')
+DESC=$(echo "$ALERT" | jq -r '.rule.description // "Aucune description fournie"')
+LEVEL=$(echo "$ALERT" | jq -r '.rule.level // 0')
+DATE=$(date '+%Y-%m-%d %H:%M:%S')
+
+# MITRE ATT&CK
+MITRE_ID=$(echo "$ALERT" | jq -r '.rule.mitre.id[]?' | paste -sd ',' -)
+TACTIC=$(echo "$ALERT" | jq -r '.rule.mitre.tactic[]?' | paste -sd ',' -)
+TECHNIQUE=$(echo "$ALERT" | jq -r '.rule.mitre.technique[]?' | paste -sd ',' -)
+
+# Infos CVE
+CVE=$(echo "$ALERT" | jq -r '.data.alert.metadata.cve[0] // empty')
+PKG=$(echo "$ALERT" | jq -r '.data.package.name // empty')
+CVSS=$(echo "$ALERT" | jq -r '.data.cvss.score // empty')
+
+# Emoji selon gravité
+if (( LEVEL >= 15 )); then
+  EMOJI=":fire:"
+elif (( LEVEL >= 10 )); then
+  EMOJI=":warning:"
+else
+  EMOJI=":mag:"
+fi
+
+# Message Slack
+MESSAGE="$EMOJI *Alerte Wazuh - $DATE*\n"
+MESSAGE+="• *Agent* : $AGENT\n"
+MESSAGE+="• *IP source* : $SRCIP\n"
+MESSAGE+="• *Règle ID* : $RULEID\n"
+MESSAGE+="• *Gravité* : $LEVEL\n"
+MESSAGE+="• *Description* : $DESC"
+
+# Vulnérabilité
+if [[ -n "$CVE" ]]; then
+  MESSAGE+="\n\n:rotating_light: *Vulnérabilité détectée*\n"
+  MESSAGE+="• CVE : $CVE\n• Paquet : $PKG\n• CVSS : $CVSS"
+fi
+
+# MITRE
+if [[ -n "$MITRE_ID" ]]; then
+  MESSAGE+="\n\n🎯 *MITRE ATT&CK*\n• ID : $MITRE_ID\n• Tactique : $TACTIC\n• Technique : $TECHNIQUE"
+fi
+
+# Webhook Slack
+WEBHOOK="https://hooks.slack.com/services/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"
+
+# Envoi
+curl -s -X POST -H 'Content-type: application/json' \
+  --data "{\"text\": \"$MESSAGE\"}" "$WEBHOOK" > /dev/null 2>&1
+
+# Log local
+echo "$DATE | $AGENT | Rule:$RULEID | Level:$LEVEL | $DESC" >> /var/ossec/logs/slack_notify.log
