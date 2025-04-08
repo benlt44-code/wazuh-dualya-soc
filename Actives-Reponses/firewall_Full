@@ -1,71 +1,78 @@
 #!/bin/bash
+set -euo pipefail
 
 LOG_FILE="/var/log/wazuh/firewall_Full.log"
 STATE_FILE="/var/ossec/active-response/bin/firewall_state.json"
 WHITELIST="/var/ossec/active-response/bin/whitelist.txt"
+TMP_STATE="$(mktemp)"
+DATE_NOW=$(date '+%F %T')
 
-ACTION=$1
-read INPUT_JSON
+ACTION=${1:-""}
+INPUT_JSON=$(cat)  # Lecture robuste de stdin complet
 
-# Extraction robuste de l'alerte
-ALERT=$(echo "$INPUT_JSON" | jq -r '.parameters.alert // .alert // empty')
+# Debug : log brut JSON
+echo "$DATE_NOW 🔍 JSON brut reçu: $INPUT_JSON" >> "$LOG_FILE"
 
-# Debug: log brut
-echo "$(date '+%F %T') 🔍 JSON brut reçu: $INPUT_JSON" >> "$LOG_FILE"
+# Extraction alerte
+ALERT=$(echo "$INPUT_JSON" | jq -er '.parameters.alert // .alert')
 
-# Extraction de l’IP
-IP=$(echo "$ALERT" | jq -r '.data.srcip // .srcip // empty')
+# Extraction de l’IP source
+IP=$(echo "$ALERT" | jq -er '.data.srcip // .srcip')
 
-# Vérification IP valide
-if [ -z "$IP" ] || [ "$IP" == "null" ]; then
-    echo "$(date '+%F %T') ❌ IP invalide ou non présente, sortie. Donnée reçue: $INPUT_JSON" >> "$LOG_FILE"
+# Vérification IP valide (IPv4 uniquement ici)
+if [[ ! "$IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    echo "$DATE_NOW ❌ IP invalide ou non présente : $IP" >> "$LOG_FILE"
     exit 1
 fi
 
 # Whitelist
-if grep -qFx "$IP" "$WHITELIST"; then
-    echo "$(date '+%F %T') 🛡️ IP $IP dans whitelist, ignorée." >> "$LOG_FILE"
+if [ -f "$WHITELIST" ] && grep -qFx "$IP" "$WHITELIST"; then
+    echo "$DATE_NOW 🛡️ IP $IP dans whitelist, ignorée." >> "$LOG_FILE"
     exit 0
 fi
 
-# Init état
+# Init état si inexistant
 [ ! -f "$STATE_FILE" ] && echo '{}' > "$STATE_FILE"
 
-# Incrément
+# Lecture et incrément du compteur
 COUNT=$(jq -r --arg ip "$IP" '.[$ip].count // 0' "$STATE_FILE")
 NEW_COUNT=$((COUNT + 1))
 
-# Durée par palier
+# Durée selon le palier
 case $NEW_COUNT in
-    1) DURATION=30 ;;
-    2) DURATION=300 ;;
-    3) DURATION=3600 ;;
-    *) DURATION=0 ;;
+    1) DURATION=30 ;;       # 30s
+    2) DURATION=300 ;;      # 5 min
+    3) DURATION=3600 ;;     # 1h
+    *) DURATION=0 ;;        # définitif
 esac
 
-# Sauvegarde état
+# Mise à jour du fichier d'état
 jq --arg ip "$IP" --argjson count "$NEW_COUNT" \
    '.[$ip].count = $count | .[$ip].last_seen = (now | todate)' \
-   "$STATE_FILE" > tmp.$$.json && mv tmp.$$.json "$STATE_FILE"
+   "$STATE_FILE" > "$TMP_STATE"
+mv "$TMP_STATE" "$STATE_FILE"
 
-# Traitement des actions
+# Traitement selon action
 case "$ACTION" in
   add)
     iptables -I INPUT -s "$IP" -j DROP
     if [ "$DURATION" -eq 0 ]; then
-      echo "$(date '+%F %T') ⛔ IP $IP bloquée définitivement (tentatives: $NEW_COUNT)." >> "$LOG_FILE"
+        echo "$DATE_NOW ⛔ IP $IP bloquée *définitivement* (tentatives: $NEW_COUNT)." >> "$LOG_FILE"
     else
-      echo "$(date '+%F %T') ⛔ IP $IP bloquée pour $DURATION secondes (tentatives: $NEW_COUNT)." >> "$LOG_FILE"
-      (sleep "$DURATION"; iptables -D INPUT -s "$IP" -j DROP && \
-       echo "$(date '+%F %T') ✅ IP $IP débloquée après $DURATION secondes." >> "$LOG_FILE") &
+        echo "$DATE_NOW ⛔ IP $IP bloquée pour $DURATION sec (tentatives: $NEW_COUNT)." >> "$LOG_FILE"
+        (
+            sleep "$DURATION"
+            iptables -D INPUT -s "$IP" -j DROP && \
+            echo "$(date '+%F %T') ✅ IP $IP débloquée après $DURATION sec." >> "$LOG_FILE"
+        ) &
     fi
     ;;
   delete)
     iptables -D INPUT -s "$IP" -j DROP
-    echo "$(date '+%F %T') 🗑️ IP $IP débloquée manuellement." >> "$LOG_FILE"
+    echo "$DATE_NOW 🗑️ IP $IP débloquée manuellement." >> "$LOG_FILE"
     ;;
   *)
-    echo "$(date '+%F %T') ⚠️ Action inconnue ($ACTION), sortie." >> "$LOG_FILE"
+    echo "$DATE_NOW ⚠️ Action inconnue ($ACTION), sortie." >> "$LOG_FILE"
     exit 1
     ;;
 esac
