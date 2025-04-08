@@ -1,0 +1,16 @@
+[Unit]
+Description=Archivage automatique des logs Wazuh vers SMB
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/opt/wazuh/logrotate_wazuh.sh
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+User=root
+WorkingDirectory=/opt/wazuh
+
+[Install]
+WantedBy=multi-user.target
